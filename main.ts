@@ -1,6 +1,4 @@
-// main.ts - Финальная версия с использованием Deno.serve
-
-// Мы больше НЕ ИСПОЛЬЗУЕМ старую библиотеку 'serve'.
+// main.ts - Финальная каноническая версия с Deno.createHttpClient
 
 // --- КОНФИГУРАЦИЯ GIGACHAT ---
 const GIGA_TOKEN_URL = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth";
@@ -15,6 +13,12 @@ const GIGA_SCOPE = "GIGACHAT_API_PERS";
 let accessToken: string | null = null;
 let tokenExpiresAt = 0;
 
+// --- СОЗДАЕМ КЛИЕНТ, КОТОРЫЙ ИГНОРИРУЕТ ОШИБКИ SSL ---
+// Это самый надежный способ. Игнорируем ошибки редактора, если они есть.
+const unsafeClient = Deno.createHttpClient({
+  unsafelyIgnoreCertificateErrors: true,
+});
+
 async function getAccessToken() {
   if (accessToken && Date.now() < tokenExpiresAt) {
     return accessToken;
@@ -28,6 +32,8 @@ async function getAccessToken() {
       "RqUID": crypto.randomUUID(),
     },
     body: `scope=${GIGA_SCOPE}`,
+    // Применяем наш клиент к запросу токена
+    client: unsafeClient, 
   });
   if (!response.ok) {
     const errorText = await response.text();
@@ -40,25 +46,12 @@ async function getAccessToken() {
   return accessToken;
 }
 
-// --- ОСНОВНОЙ СЕРВЕР ---
-const unsafeClient = Deno.createHttpClient({
-  unsafelyIgnoreCertificateErrors: true,
-});
-
-// Наша основная логика, которая будет обрабатывать каждый запрос
+// --- ОСНОВНАЯ ЛОГИКА СЕРВЕРА ---
 async function handler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 204,
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      },
-    });
+    return new Response(null, { status: 204, headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "POST, OPTIONS", "Access-Control-Allow-Headers": "Content-Type, Authorization" } });
   }
   if (!GIGA_AUTH_CREDENTIALS || !PROXY_SECRET_KEY) {
-    console.error("Server configuration error: Secrets are not set.");
     return new Response("Server configuration error.", { status: 500 });
   }
   if (req.method !== 'POST' || req.headers.get("Authorization") !== `Bearer ${PROXY_SECRET_KEY}`) {
@@ -74,28 +67,21 @@ async function handler(req: Request): Promise<Response> {
         "Authorization": `Bearer ${token}`,
       },
       body: JSON.stringify(requestBody),
+      // Применяем наш клиент и к запросу чата
       client: unsafeClient,
     });
     if (!gigaResponse.ok) {
       const errorText = await gigaResponse.text();
-      console.error("GigaChat API Error:", errorText);
       return new Response(errorText, { status: gigaResponse.status });
     }
     const responseData = await gigaResponse.json();
-    return new Response(JSON.stringify(responseData), {
-      headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
-      },
-    });
+    return new Response(JSON.stringify(responseData), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   // deno-lint-ignore no-explicit-any
   } catch (error: any) {
-    console.error("Proxy internal error:", error);
     return new Response(error.message, { status: 500 });
   }
 }
 
 // --- ЗАПУСК СЕРВЕРА ---
-// Новый, правильный и современный способ запуска сервера в Deno
 console.log("Starting server...");
 Deno.serve(handler);
