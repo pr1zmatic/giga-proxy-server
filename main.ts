@@ -1,27 +1,20 @@
-// main.ts - ФИНАЛЬНАЯ ВЕРСИЯ с правильным портом
+// main.ts - ФИНАЛЬНАЯ УПРОЩЕННАЯ ВЕРСИЯ
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 
 // --- КОНФИГУРАЦИЯ GIGACHAT ---
-// Адрес для получения токена
 const GIGA_TOKEN_URL = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth";
-// Адрес самого чат-API
 const GIGA_API_URL = "https://gigachat.devices.sberbank.ru/api/v1/chat/completions";
 
 // --- ПОЛУЧАЕМ СЕКРЕТЫ ИЗ ОКРУЖЕНИЯ ---
-// Ваш "Authorization Key" (ClientID:ClientSecret в Base64)
-const GIGA_AUTH_CREDENTIALS = Deno.env.get("GIGA_AUTH_CREDENTIALS"); 
-// Ваш секретный ключ для защиты прокси
+const GIGA_AUTH_CREDENTIALS = Deno.env.get("GIGA_AUTH_CREDENTIALS");
 const PROXY_SECRET_KEY = Deno.env.get("PROXY_SECRET_KEY");
-// Область доступа (scope), обязательный параметр для GigaChat
 const GIGA_SCOPE = "GIGACHAT_API_PERS";
 
 // --- УПРАВЛЕНИЕ ВРЕМЕННЫМ ТОКЕНОМ ---
-// Здесь мы будем хранить наш временный токен и время его жизни
 let accessToken: string | null = null;
-let tokenExpiresAt = 0; // Время в миллисекундах
+let tokenExpiresAt = 0;
 
-// Функция для получения или обновления токена
 async function getAccessToken() {
   if (accessToken && Date.now() < tokenExpiresAt) {
     return accessToken;
@@ -42,7 +35,7 @@ async function getAccessToken() {
   }
   const data = await response.json();
   accessToken = data.access_token;
-  tokenExpiresAt = Date.now() + (data.expires_in * 1000) - 60000; 
+  tokenExpiresAt = Date.now() + (data.expires_in * 1000) - 60000;
   console.log("Successfully received new access token.");
   return accessToken;
 }
@@ -52,6 +45,7 @@ const unsafeClient = Deno.createHttpClient({
   unsafelyIgnoreCertificateErrors: true,
 });
 
+// Мы вынесли всю логику в отдельную функцию `handler`
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
     return new Response(null, {
@@ -89,7 +83,7 @@ const handler = async (req: Request): Promise<Response> => {
     }
     const responseData = await gigaResponse.json();
     return new Response(JSON.stringify(responseData), {
-      headers: { 
+      headers: {
         "Content-Type": "application/json",
         "Access-Control-Allow-Origin": "*",
       },
@@ -101,8 +95,7 @@ const handler = async (req: Request): Promise<Response> => {
   }
 };
 
-// --- ЗАПУСК СЕРВЕРА ---
-// Вот это изменение! Мы читаем порт из окружения.
-const port = parseInt(Deno.env.get("PORT") ?? "8000");
-console.log(`Listening on http://localhost:${port}/`);
-serve(handler, { port });
+// --- ЗАПУСК СЕРВЕРЕ ---
+// Вот и все изменение! Никаких портов, Deno Deploy сделает все сам.
+console.log("Starting server...");
+serve(handler);
