@@ -1,6 +1,6 @@
-// main.ts - ФИНАЛЬНАЯ УПРОЩЕННАЯ ВЕРСИЯ
+// main.ts - Финальная версия с использованием Deno.serve
 
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+// Мы больше НЕ ИСПОЛЬЗУЕМ старую библиотеку 'serve'.
 
 // --- КОНФИГУРАЦИЯ GIGACHAT ---
 const GIGA_TOKEN_URL = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth";
@@ -45,8 +45,8 @@ const unsafeClient = Deno.createHttpClient({
   unsafelyIgnoreCertificateErrors: true,
 });
 
-// Мы вынесли всю логику в отдельную функцию `handler`
-const handler = async (req: Request): Promise<Response> => {
+// Наша основная логика, которая будет обрабатывать каждый запрос
+async function handler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') {
     return new Response(null, {
       status: 204,
@@ -93,9 +93,9 @@ const handler = async (req: Request): Promise<Response> => {
     console.error("Proxy internal error:", error);
     return new Response(error.message, { status: 500 });
   }
-};
+}
 
-// --- ЗАПУСК СЕРВЕРЕ ---
-// Вот и все изменение! Никаких портов, Deno Deploy сделает все сам.
+// --- ЗАПУСК СЕРВЕРА ---
+// Новый, правильный и современный способ запуска сервера в Deno
 console.log("Starting server...");
-serve(handler);
+Deno.serve(handler);
